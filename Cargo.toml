@@ -1,0 +1,13 @@
+[package]
+name = "ergo-rs"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0.101"
+btleplug = "0.11.8"
+futures = "0.3.32"
+inquire = "0.9.3"
+matter-rs = "0.0.1"
+tokio = { version = "1.49.0", features = ["full"] }
+uuid = "1.21.0"

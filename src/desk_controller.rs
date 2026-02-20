@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use btleplug::api::{Central, Peripheral, ScanFilter, WriteType::WithoutResponse};
 use futures::StreamExt;
 use std::sync::Arc;
@@ -27,6 +27,36 @@ pub(crate) enum DeskEvent {
     HeightStatic(f32),
 }
 
+impl TryFrom<Vec<u8>> for DeskEvent {
+    fn try_from(data: Vec<u8>) -> Result<Self> {
+        let (p1, p2, p3, p4) = (data[0], data[1], data[2], data[3]);
+        let err = anyhow!("Cant parse: {:?}", data);
+        match p1 {
+            0x0B => Ok(DeskEvent::StartMoving),
+            0x08 => {
+                let h = get_height(p3, p4);
+                match p2 {
+                    0x01 => Ok(DeskEvent::HeightMoving(h)),
+                    0x06 => Ok(DeskEvent::HeightStatic(h)),
+                    _ => Err(err),
+                }
+            }
+            0x09 => Ok(DeskEvent::MovingEnd(get_height(p3, p4))),
+            0x02 => Ok(DeskEvent::StartMovingUp),
+            0x01 => Ok(DeskEvent::StartMovingDown),
+            _ => Err(err),
+        }
+    }
+
+    type Error = anyhow::Error;
+}
+
+fn get_height(p1: u8, p2: u8) -> f32 {
+    let raw = ((p1 as u16) << 8) | (p2 as u16);
+    let height = (raw as f32 / 43.22) + 24.16;
+    return height;
+}
+
 #[derive(Clone, Debug)]
 pub(crate) enum DeskCommand {
     MoveUp,
@@ -44,12 +74,6 @@ impl From<DeskCommand> for &'static [u8] {
             DeskCommand::GetHeight => CMD_PULL,
         }
     }
-}
-
-fn get_height(p1: u8, p2: u8) -> f32 {
-    let raw = ((p1 as u16) << 8) | (p2 as u16);
-    let height = (raw as f32 / 43.22) + 24.16;
-    return height;
 }
 
 pub(crate) async fn device_finder(
@@ -87,24 +111,7 @@ pub(crate) async fn start_read_thread(
     let mut stream = desk.notifications().await?;
 
     while let Some(data) = stream.next().await {
-        let (p1, p2, p3, p4) = (data.value[0], data.value[1], data.value[2], data.value[3]);
-        let cmd = match p1 {
-            0x0B => Some(DeskEvent::StartMoving),
-            0x08 => {
-                let h = get_height(p3, p4);
-                match p2 {
-                    0x01 => Some(DeskEvent::HeightMoving(h)),
-                    0x06 => Some(DeskEvent::HeightStatic(h)),
-                    _ => None,
-                }
-            }
-            0x09 => Some(DeskEvent::MovingEnd(get_height(p3, p4))),
-            0x02 => Some(DeskEvent::StartMovingUp),
-            0x01 => Some(DeskEvent::StartMovingDown),
-            _ => None,
-        };
-
-        if let Some(cmd) = cmd {
+        if let Ok(cmd) = data.value.try_into() {
             let _ = notify.send(cmd);
         }
     }

@@ -125,20 +125,14 @@ pub(crate) async fn start_write_thread(
         .clone();
 
     while let Some(command) = cmd.recv().await {
-        match command {
-            DeskCommand::MoveUp => {
-                desk.write(notify_char, CMD_UP, WithoutResponse).await?;
-            }
-            DeskCommand::MoveDown => {
-                desk.write(notify_char, CMD_DOWN, WithoutResponse).await?;
-            }
-            DeskCommand::Stop => {
-                desk.write(notify_char, CMD_STOP, WithoutResponse).await?;
-            }
-            DeskCommand::GetHeight => {
-                desk.write(notify_char, CMD_PULL, WithoutResponse).await?;
-            }
-        }
+        let command = match command {
+            DeskCommand::MoveUp => CMD_UP,
+            DeskCommand::MoveDown => CMD_DOWN,
+            DeskCommand::Stop => CMD_STOP,
+            DeskCommand::GetHeight => CMD_PULL,
+        };
+
+        desk.write(notify_char, command, WithoutResponse).await?;
     }
     Ok(())
 }

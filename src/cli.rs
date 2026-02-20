@@ -1,4 +1,5 @@
 use anyhow::Result;
+use inquire::Text;
 use tokio::select;
 
 use crate::desk_controller::DeskEvent;
@@ -7,8 +8,7 @@ pub(crate) async fn interactive_mode(
     set_target_height: tokio::sync::mpsc::Sender<f32>,
 ) -> Result<()> {
     loop {
-        let target = inquire::Text::new("Укажите высоту:").prompt()?;
-        let target: f32 = target.parse()?;
+        let target = Text::new("Set height:").prompt()?.parse()?;
         set_target_height.send(target).await?;
     }
 }

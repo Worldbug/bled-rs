@@ -88,35 +88,24 @@ pub(crate) async fn start_read_thread(
 
     while let Some(data) = stream.next().await {
         let (p1, p2, p3, p4) = (data.value[0], data.value[1], data.value[2], data.value[3]);
-
-        match p1 {
-            0x0B => {
-                let _ = notify.send(DeskEvent::StartMoving);
-            }
+        let cmd = match p1 {
+            0x0B => Some(DeskEvent::StartMoving),
             0x08 => {
                 let h = get_height(p3, p4);
-
                 match p2 {
-                    0x01 => {
-                        let _ = notify.send(DeskEvent::HeightMoving(h));
-                    }
-                    0x06 => {
-                        let _ = notify.send(DeskEvent::HeightStatic(h));
-                    }
-                    _ => {}
-                };
+                    0x01 => Some(DeskEvent::HeightMoving(h)),
+                    0x06 => Some(DeskEvent::HeightStatic(h)),
+                    _ => None,
+                }
             }
-            0x09 => {
-                let h = get_height(p3, p4);
-                let _ = notify.send(DeskEvent::MovingEnd(h));
-            }
-            0x02 => {
-                let _ = notify.send(DeskEvent::StartMovingUp);
-            }
-            0x01 => {
-                let _ = notify.send(DeskEvent::StartMovingDown);
-            }
-            _ => {}
+            0x09 => Some(DeskEvent::MovingEnd(get_height(p3, p4))),
+            0x02 => Some(DeskEvent::StartMovingUp),
+            0x01 => Some(DeskEvent::StartMovingDown),
+            _ => None,
+        };
+
+        if let Some(cmd) = cmd {
+            let _ = notify.send(cmd);
         }
     }
 

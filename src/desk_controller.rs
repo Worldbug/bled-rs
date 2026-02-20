@@ -35,6 +35,17 @@ pub(crate) enum DeskCommand {
     GetHeight,
 }
 
+impl From<DeskCommand> for &'static [u8] {
+    fn from(cmd: DeskCommand) -> Self {
+        match cmd {
+            DeskCommand::MoveUp => CMD_UP,
+            DeskCommand::MoveDown => CMD_DOWN,
+            DeskCommand::Stop => CMD_STOP,
+            DeskCommand::GetHeight => CMD_PULL,
+        }
+    }
+}
+
 fn get_height(p1: u8, p2: u8) -> f32 {
     let raw = ((p1 as u16) << 8) | (p2 as u16);
     let height = (raw as f32 / 43.22) + 24.16;
@@ -124,15 +135,8 @@ pub(crate) async fn start_write_thread(
         .unwrap()
         .clone();
 
-    while let Some(command) = cmd.recv().await {
-        let command = match command {
-            DeskCommand::MoveUp => CMD_UP,
-            DeskCommand::MoveDown => CMD_DOWN,
-            DeskCommand::Stop => CMD_STOP,
-            DeskCommand::GetHeight => CMD_PULL,
-        };
-
-        desk.write(notify_char, command, WithoutResponse).await?;
+    while let Some(cmd) = cmd.recv().await {
+        desk.write(notify_char, cmd.into(), WithoutResponse).await?;
     }
     Ok(())
 }
